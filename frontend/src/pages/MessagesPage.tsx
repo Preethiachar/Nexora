@@ -6,7 +6,7 @@ import {
   Paperclip, FileText, Download, Award, Shield, FileUp, Loader2
 } from "lucide-react";
 import { ConversationItem, MessageItem, UserSummary, IdeaGroupItem, GroupMessageItem } from "../types";
-import { api } from "../services/api";
+import { api, getFileUrl } from "../services/api";
 
 interface PeerInfo {
   id: number;
@@ -785,7 +785,7 @@ export const MessagesPage: React.FC<MessagesPageProps> = ({ currentUser }) => {
                                 </div>
 
                                 <a
-                                  href={`http://127.0.0.1:8000${m.file_url}`}
+                                  href={getFileUrl(m.file_url || "")}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   download

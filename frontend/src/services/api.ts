@@ -1,5 +1,14 @@
 const getApiBase = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
+
+  // When deployed to production (e.g. Render, or any non-localhost domain),
+  // ensure we hit the live Render backend service
+  if (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    if (!envUrl || envUrl.includes("127.0.0.1") || envUrl.includes("localhost")) {
+      return "https://nexora-backend-to0k.onrender.com/api/v1";
+    }
+  }
+
   if (!envUrl) return "http://127.0.0.1:8000/api/v1";
   let cleanUrl = envUrl.replace(/\/+$/, "");
   if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
@@ -8,7 +17,15 @@ const getApiBase = () => {
   return cleanUrl.endsWith("/api/v1") ? cleanUrl : `${cleanUrl}/api/v1`;
 };
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
+
+export const getFileUrl = (path: string): string => {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  const baseHost = API_BASE.replace(/\/api\/v1\/?$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseHost}${cleanPath}`;
+};
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem("nexora_token");
