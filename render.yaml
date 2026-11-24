@@ -1,5 +1,4 @@
 services:
-  # ── Backend: FastAPI Web Service ──────────────────────────────────────────
   - type: web
     name: nexora-backend
     runtime: python
@@ -15,11 +14,10 @@ services:
       - key: REDIS_URL
         value: ""
       - key: ANTHROPIC_API_KEY
-        sync: false
+        value: ""
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: "3.11.0"
 
-  # ── Frontend: React/Vite Static Site ─────────────────────────────────────
   - type: web
     name: nexora-frontend
     runtime: static
@@ -37,4 +35,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        sync: false
+        value: ""
