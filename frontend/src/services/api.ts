@@ -1,4 +1,14 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
+const getApiBase = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!envUrl) return "http://127.0.0.1:8000/api/v1";
+  let cleanUrl = envUrl.replace(/\/+$/, "");
+  if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+    cleanUrl = `https://${cleanUrl}`;
+  }
+  return cleanUrl.endsWith("/api/v1") ? cleanUrl : `${cleanUrl}/api/v1`;
+};
+
+const API_BASE = getApiBase();
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem("nexora_token");

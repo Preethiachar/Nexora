@@ -1,3 +1,9 @@
+databases:
+  - name: nexora-db
+    databaseName: nexora
+    user: nexora_user
+    plan: free
+
 services:
   - type: web
     name: nexora-backend
@@ -10,7 +16,9 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        value: sqlite:///./nexora.db
+        fromDatabase:
+          name: nexora-db
+          property: connectionString
       - key: REDIS_URL
         value: ""
       - key: ANTHROPIC_API_KEY
@@ -35,4 +43,7 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        value: ""
+        fromService:
+          type: web
+          name: nexora-backend
+          property: host
