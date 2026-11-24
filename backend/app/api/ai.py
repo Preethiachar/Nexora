@@ -4,13 +4,17 @@ from app.database.session import get_db
 from app.models.all_models import User, Job
 from app.schemas.schemas import (
     AIResumeScreenRequest, AIPostGenerateRequest, 
-    AIProfileImproveRequest, AIChatRequest
+    AIProfileImproveRequest, AIChatRequest,
+    AIResumeExtractRequest, AIGenerateEmailRequest,
+    AIBuildOptimizedResumeRequest
 )
 from app.api.deps import get_current_user
 from app.services.nlp_service import calculate_ats_match
 from app.services.claude_service import (
     generate_ai_post, improve_profile, 
-    analyze_resume_feedback, answer_career_question
+    analyze_resume_feedback, answer_career_question,
+    extract_resume_data, generate_outreach_email,
+    build_optimized_resume
 )
 
 router = APIRouter(prefix="/ai", tags=["AI & NLP Intelligence"])
@@ -40,6 +44,37 @@ def screen_resume(req: AIResumeScreenRequest, db: Session = Depends(get_db)):
         "job_title": job_title
     }
 
+@router.post("/extract-resume")
+def extract_resume_endpoint(req: AIResumeExtractRequest):
+    data = extract_resume_data(req.resume_text)
+    return data
+
+@router.post("/generate-email")
+def generate_email_endpoint(req: AIGenerateEmailRequest, current_user: User = Depends(get_current_user)):
+    sender_name = current_user.full_name
+    sender_headline = current_user.profile.headline if current_user.profile and current_user.profile.headline else "Student Technologist"
+    result = generate_outreach_email(
+        recipient_name=req.recipient_name,
+        recipient_headline=req.recipient_headline or "",
+        sender_name=sender_name,
+        sender_headline=sender_headline,
+        mail_type=req.mail_type,
+        tone=req.tone,
+        key_notes=req.key_notes or ""
+    )
+    return result
+
+@router.post("/build-optimized-resume")
+def build_optimized_resume_endpoint(req: AIBuildOptimizedResumeRequest):
+    result = build_optimized_resume(
+        resume_text=req.resume_text,
+        target_role=req.job_title or "Target Opportunity",
+        job_description=req.job_description or "",
+        missing_skills=req.missing_skills or [],
+        recommendations=req.recommendations or []
+    )
+    return result
+
 @router.post("/generate-post")
 def generate_post_endpoint(req: AIPostGenerateRequest):
     content = generate_ai_post(req.topic, req.post_type, req.tone)
@@ -62,3 +97,4 @@ def career_chat_endpoint(req: AIChatRequest, current_user: User = Depends(get_cu
         
     answer = answer_career_question(req.question, user_context)
     return {"response": answer}
+

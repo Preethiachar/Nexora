@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Sparkles, CheckCircle2, AlertCircle, RefreshCw, FileText, ArrowRight } from "lucide-react";
-import { Job, ATSMatchResult } from "../types";
+import { 
+  Sparkles, CheckCircle2, AlertCircle, RefreshCw, FileText, 
+  ArrowRight, Wand2, Copy, Download, Check, Zap, CheckCheck
+} from "lucide-react";
+import { Job, ATSMatchResult, OptimizedResumeResult } from "../types";
 import { api } from "../services/api";
 
 export const ResumeScreeningPage: React.FC = () => {
@@ -21,6 +24,13 @@ Experience:
   );
   const [isScreening, setIsScreening] = useState(false);
   const [atsResult, setAtsResult] = useState<ATSMatchResult | null>(null);
+
+  // Automatic Resume Builder states
+  const [isBuildingResume, setIsBuildingResume] = useState(false);
+  const [optimizedResume, setOptimizedResume] = useState<OptimizedResumeResult | null>(null);
+  const [copiedOptimized, setCopiedOptimized] = useState(false);
+  const [isApplyingToProfile, setIsApplyingToProfile] = useState(false);
+  const [profileAppliedMsg, setProfileAppliedMsg] = useState("");
 
   useEffect(() => {
     api.getJobs()
@@ -51,23 +61,81 @@ Experience:
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!resumeText.trim() || !jobDescription.trim()) return;
+  const handleAnalyze = async (overrideResume?: string) => {
+    const textToAnalyze = typeof overrideResume === "string" ? overrideResume : resumeText;
+    if (!textToAnalyze.trim() || !jobDescription.trim()) return;
     setIsScreening(true);
     try {
       const res = await api.screenResume({
-        resume_text: resumeText,
+        resume_text: textToAnalyze,
         job_id: typeof selectedJobId === "number" ? selectedJobId : undefined,
         job_title: jobTitle,
         job_description: jobDescription,
       });
       setAtsResult(res);
+      if (typeof overrideResume === "string") {
+        setResumeText(overrideResume);
+      }
     } catch (err) {
       console.error("Failed to screen resume:", err);
     } finally {
       setIsScreening(false);
     }
   };
+
+  const handleBuildResume = async () => {
+    if (!atsResult) return;
+    setIsBuildingResume(true);
+    setProfileAppliedMsg("");
+    try {
+      const res = await api.buildOptimizedResume({
+        resume_text: resumeText,
+        job_title: jobTitle,
+        job_description: jobDescription,
+        missing_skills: atsResult.missing_skills,
+        recommendations: atsResult.recommendations,
+      });
+      setOptimizedResume(res);
+    } catch (err) {
+      console.error("Failed to build optimized resume:", err);
+    } finally {
+      setIsBuildingResume(false);
+    }
+  };
+
+  const handleCopyOptimizedResume = () => {
+    if (!optimizedResume) return;
+    navigator.clipboard.writeText(optimizedResume.optimized_resume_text);
+    setCopiedOptimized(true);
+    setTimeout(() => setCopiedOptimized(false), 2000);
+  };
+
+  const handleDownloadResume = () => {
+    if (!optimizedResume) return;
+    const element = document.createElement("a");
+    const file = new Blob([optimizedResume.optimized_resume_text], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = `${jobTitle.replace(/[^a-zA-Z0-9]/g, "_")}_Optimized_Resume.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleApplyToProfile = async () => {
+    if (!optimizedResume) return;
+    setIsApplyingToProfile(true);
+    try {
+      const extracted = await api.extractResume(optimizedResume.optimized_resume_text);
+      await api.applyExtractedResume(extracted);
+      setProfileAppliedMsg("✅ Applied optimized skills, summary, and experience to your Nexora Profile!");
+      setTimeout(() => setProfileAppliedMsg(""), 3500);
+    } catch (err) {
+      console.error("Failed to apply to profile:", err);
+    } finally {
+      setIsApplyingToProfile(false);
+    }
+  };
+
 
   return (
     <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 16px" }}>
@@ -151,7 +219,7 @@ Experience:
             <button
               className="btn-civic"
               style={{ width: "100%", justifyContent: "center", padding: "10px 0" }}
-              onClick={handleAnalyze}
+              onClick={() => handleAnalyze()}
               disabled={isScreening}
             >
               <Sparkles size={16} />
@@ -262,6 +330,136 @@ Experience:
                   </ul>
                 </div>
               )}
+
+              {/* AUTOMATIC RESUME BUILDING SECTION AFTER GETTING SCORE */}
+              <div
+                style={{
+                  marginTop: 18,
+                  padding: 16,
+                  borderRadius: 10,
+                  backgroundColor: "#f0fdf4",
+                  border: "1.5px solid #86efac",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: "#dcfce7", color: "#166534", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Zap size={16} />
+                      </div>
+                      <h4 style={{ fontFamily: "var(--font-heading)", fontSize: "0.95rem", fontWeight: 800, color: "#166534" }}>
+                        Automatic Resume Builder & Score Booster
+                      </h4>
+                    </div>
+                    <p style={{ fontSize: "0.78rem", color: "#334155", marginTop: 4 }}>
+                      AI will rewrite your resume, inject the {atsResult.missing_skills.length} missing keywords, and formulate STAR quantifiable bullets to boost your ATS match to 95%+.
+                    </p>
+                  </div>
+                </div>
+
+                {profileAppliedMsg && (
+                  <div style={{ padding: "8px 12px", backgroundColor: "#ffffff", border: "1px solid #86efac", borderRadius: 6, color: "#166534", fontSize: "0.78rem", fontWeight: 700, marginTop: 10 }}>
+                    {profileAppliedMsg}
+                  </div>
+                )}
+
+                {!optimizedResume ? (
+                  <button
+                    type="button"
+                    className="btn-civic"
+                    style={{ width: "100%", justifyContent: "center", marginTop: 12, padding: "10px 0", fontSize: "0.85rem" }}
+                    onClick={handleBuildResume}
+                    disabled={isBuildingResume}
+                  >
+                    <Wand2 size={16} />
+                    <span>{isBuildingResume ? "Architecting ATS-Compliant Resume with Claude..." : "⚡ Auto-Build ATS-Optimized Resume"}</span>
+                  </button>
+                ) : (
+                  <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="badge-tag badge-tag-civic" style={{ fontSize: "0.76rem" }}>
+                        ✨ Projected ATS Score: <strong>{optimizedResume.projected_score}% Match</strong>
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        style={{ fontSize: "0.72rem" }}
+                        onClick={() => setOptimizedResume(null)}
+                      >
+                        Reset / Re-build
+                      </button>
+                    </div>
+
+                    {/* Injected Keywords Badge List */}
+                    <div style={{ padding: 10, backgroundColor: "#ffffff", borderRadius: 6, border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>
+                        Integrated Keywords:
+                      </span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {optimizedResume.added_keywords.map((kw, i) => (
+                          <span key={i} className="badge-tag badge-tag-civic" style={{ fontSize: "0.68rem" }}>
+                            + {kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Editable Resume Text */}
+                    <textarea
+                      className="form-textarea"
+                      rows={10}
+                      value={optimizedResume.optimized_resume_text}
+                      onChange={(e) => setOptimizedResume({ ...optimizedResume, optimized_resume_text: e.target.value })}
+                      style={{ fontFamily: "monospace", fontSize: "0.78rem", backgroundColor: "#ffffff" }}
+                    />
+
+                    {/* Action Buttons */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => handleAnalyze(optimizedResume.optimized_resume_text)}
+                        style={{ justifyContent: "center", fontSize: "0.78rem", padding: "8px 0" }}
+                        title="Run ATS Screen on this optimized resume to verify your improved score"
+                      >
+                        <RefreshCw size={14} />
+                        <span>Re-Screen with This</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-civic"
+                        onClick={handleCopyOptimizedResume}
+                        style={{ justifyContent: "center", fontSize: "0.78rem", padding: "8px 0" }}
+                      >
+                        {copiedOptimized ? <Check size={14} /> : <Copy size={14} />}
+                        <span>{copiedOptimized ? "Copied!" : "Copy Resume"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={handleDownloadResume}
+                        style={{ justifyContent: "center", fontSize: "0.78rem", padding: "8px 0", backgroundColor: "#ffffff", border: "1px solid #cbd5e1" }}
+                      >
+                        <Download size={14} />
+                        <span>Download (.txt)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={handleApplyToProfile}
+                        disabled={isApplyingToProfile}
+                        style={{ justifyContent: "center", fontSize: "0.78rem", padding: "8px 0", backgroundColor: "#ffffff", border: "1px solid #cbd5e1", color: "var(--civic)" }}
+                      >
+                        <CheckCheck size={14} />
+                        <span>{isApplyingToProfile ? "Applying..." : "Apply to Profile"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="nexora-card" style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>

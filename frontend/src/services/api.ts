@@ -1,4 +1,4 @@
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem("nexora_token");
@@ -15,9 +15,12 @@ export const clearAuthToken = () => {
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
+
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -107,6 +110,14 @@ export const api = {
 
   // AI & NLP Services
   screenResume: (data: any) => apiRequest<any>("/ai/screen-resume", { method: "POST", body: JSON.stringify(data) }),
+  extractResume: (resumeText: string) =>
+    apiRequest<any>("/ai/extract-resume", { method: "POST", body: JSON.stringify({ resume_text: resumeText }) }),
+  applyExtractedResume: (data: any) =>
+    apiRequest<any>("/profiles/me/apply-extracted-resume", { method: "POST", body: JSON.stringify(data) }),
+  generateEmail: (data: { recipient_name: string; recipient_headline?: string; mail_type: string; tone: string; key_notes?: string }) =>
+    apiRequest<{ subject: string; body: string }>("/ai/generate-email", { method: "POST", body: JSON.stringify(data) }),
+  buildOptimizedResume: (data: { resume_text: string; job_title?: string; job_description?: string; missing_skills?: string[]; recommendations?: string[] }) =>
+    apiRequest<{ optimized_resume_text: string; added_keywords: string[]; projected_score: number; improvements_made: string[] }>("/ai/build-optimized-resume", { method: "POST", body: JSON.stringify(data) }),
   generatePost: (topic: string, postType = "general", tone = "inspirational") =>
     apiRequest<any>("/ai/generate-post", { method: "POST", body: JSON.stringify({ topic, post_type: postType, tone }) }),
   improveProfile: (headline: string, about: string, targetRole = "Civic Tech Developer") =>
@@ -124,4 +135,36 @@ export const api = {
   getNotifications: () => apiRequest<any>("/notifications"),
   markNotificationRead: (id: number) => apiRequest<any>(`/notifications/${id}/read`, { method: "POST" }),
   markAllNotificationsRead: () => apiRequest<any>("/notifications/read-all", { method: "POST" }),
+
+  // Global Search
+  search: (query: string, category = "all") =>
+    apiRequest<any>(`/search?q=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}`),
+
+  // Mentors for Idea Marketplace
+  getMentors: () => apiRequest<any[]>("/marketplace/mentors"),
+  selectIdeaMentor: (ideaId: number, mentorId: number) =>
+    apiRequest<any>(`/marketplace/ideas/${ideaId}/mentor`, {
+      method: "POST",
+      body: JSON.stringify({ mentor_id: mentorId }),
+    }),
+
+  // Project Idea Group Messaging & Document Uploads
+  getUserGroups: () => apiRequest<any[]>("/messages/groups"),
+  getGroupMessages: (groupId: number) => apiRequest<any[]>(`/messages/groups/${groupId}/messages`),
+  sendGroupMessage: (groupId: number, content: string) =>
+    apiRequest<any>(`/messages/groups/${groupId}/send`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    }),
+  uploadGroupDocument: (groupId: number, file: File, content?: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (content) {
+      formData.append("content", content);
+    }
+    return apiRequest<any>(`/messages/groups/${groupId}/upload`, {
+      method: "POST",
+      body: formData,
+    });
+  },
 };

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Lightbulb } from "lucide-react";
 import { api } from "../services/api";
+import { MentorInfo } from "../types";
 
 interface CreateIdeaModalProps {
   onClose: () => void;
@@ -15,7 +16,15 @@ export const CreateIdeaModal: React.FC<CreateIdeaModalProps> = ({ onClose, onIde
   const [solutionStatement, setSolutionStatement] = useState("");
   const [neededSkills, setNeededSkills] = useState("React, Python, Community Organizing");
   const [teamSizeTarget, setTeamSizeTarget] = useState(4);
+  const [mentors, setMentors] = useState<MentorInfo[]>([]);
+  const [selectedMentorId, setSelectedMentorId] = useState<number | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    api.getMentors()
+      .then((data) => setMentors(data))
+      .catch((err) => console.error("Error loading mentors:", err));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +38,7 @@ export const CreateIdeaModal: React.FC<CreateIdeaModalProps> = ({ onClose, onIde
         solution_statement: solutionStatement,
         needed_skills: neededSkills,
         team_size_target: Number(teamSizeTarget),
+        mentor_id: selectedMentorId,
       });
       onIdeaCreated();
       onClose();
@@ -147,6 +157,25 @@ export const CreateIdeaModal: React.FC<CreateIdeaModalProps> = ({ onClose, onIde
                   required
                 />
               </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Select Project Mentor (Optional)</label>
+              <select
+                className="form-select"
+                value={selectedMentorId || ""}
+                onChange={(e) => setSelectedMentorId(e.target.value ? Number(e.target.value) : undefined)}
+              >
+                <option value="">-- No Mentor Selected (Choose later anytime) --</option>
+                {mentors.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name} ({m.headline || m.role})
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 4, display: "block" }}>
+                You can also select or change your mentor at any time directly on your Idea Card.
+              </span>
             </div>
           </div>
 

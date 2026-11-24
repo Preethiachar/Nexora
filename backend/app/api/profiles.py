@@ -2,7 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.all_models import User, Profile, Experience, Education, Skill, CivicBadge
-from app.schemas.schemas import ProfileUpdate, ExperienceSchema, EducationSchema, SkillSchema, CivicBadgeSchema
+from app.schemas.schemas import (
+    ProfileUpdate, ExperienceSchema, EducationSchema, 
+    SkillSchema, CivicBadgeSchema, AIExtractedProfileApplyRequest
+)
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/profiles", tags=["Profiles"])
@@ -189,3 +192,67 @@ def add_civic_badge(badge_in: CivicBadgeSchema, current_user: User = Depends(get
     db.add(badge)
     db.commit()
     return {"message": "Civic badge verified and added", "id": badge.id}
+
+@router.post("/me/apply-extracted-resume")
+def apply_extracted_resume(
+    data: AIExtractedProfileApplyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    profile = current_user.profile
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    if data.headline:
+        profile.headline = data.headline
+    if data.about:
+        profile.about = data.about
+    if data.university:
+        profile.university = data.university
+    if data.location:
+        profile.location = data.location
+
+    # Add educations
+    for edu in data.educations or []:
+        if edu.school:
+            new_edu = Education(
+                profile_id=profile.id,
+                school=edu.school,
+                degree=edu.degree or "Bachelor of Technology",
+                field_of_study=edu.field_of_study or "Computer Science",
+                start_year=edu.start_year or "2022",
+                end_year=edu.end_year or "2026"
+            )
+            db.add(new_edu)
+
+    # Add experiences
+    for exp in data.experiences or []:
+        if exp.company:
+            new_exp = Experience(
+                profile_id=profile.id,
+                company=exp.company,
+                title=exp.title or "Software Intern",
+                employment_type=exp.employment_type or "Internship",
+                start_date=exp.start_date or "2024",
+                end_date=exp.end_date or "Present",
+                description=exp.description or "",
+                is_current=exp.is_current
+            )
+            db.add(new_exp)
+
+    # Add skills (prevent duplicates)
+    for skill_name in data.skills or []:
+        skill_name_clean = skill_name.strip()
+        if not skill_name_clean:
+            continue
+        existing = db.query(Skill).filter(
+            Skill.profile_id == profile.id,
+            Skill.name.ilike(skill_name_clean)
+        ).first()
+        if not existing:
+            db.add(Skill(profile_id=profile.id, name=skill_name_clean, endorsements_count=1))
+
+    db.commit()
+    db.refresh(profile)
+    return serialize_profile(profile, current_user)
+

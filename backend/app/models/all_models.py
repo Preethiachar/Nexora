@@ -19,7 +19,7 @@ class User(Base):
     profile = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     posts = relationship("Post", back_populates="author", cascade="all, delete-orphan")
     applications = relationship("JobApplication", back_populates="user", cascade="all, delete-orphan")
-    ideas = relationship("StudentIdea", back_populates="author", cascade="all, delete-orphan")
+    ideas = relationship("StudentIdea", back_populates="author", cascade="all, delete-orphan", foreign_keys="StudentIdea.author_id")
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -205,6 +205,7 @@ class StudentIdea(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     author_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    mentor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     title = Column(String(255), nullable=False)
     summary = Column(Text, nullable=False)
     problem_statement = Column(Text, nullable=False)
@@ -215,8 +216,10 @@ class StudentIdea(Base):
     status = Column(String(50), default="open") # open, assembling, active, completed
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    author = relationship("User", back_populates="ideas")
+    author = relationship("User", foreign_keys=[author_id], back_populates="ideas")
+    mentor = relationship("User", foreign_keys=[mentor_id])
     members = relationship("IdeaMember", back_populates="idea", cascade="all, delete-orphan")
+    group = relationship("IdeaGroup", back_populates="idea", uselist=False, cascade="all, delete-orphan")
 
 class IdeaMember(Base):
     __tablename__ = "idea_members"
@@ -231,6 +234,47 @@ class IdeaMember(Base):
 
     idea = relationship("StudentIdea", back_populates="members")
     user = relationship("User")
+
+class IdeaGroup(Base):
+    __tablename__ = "idea_groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    idea_id = Column(Integer, ForeignKey("student_ideas.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    idea = relationship("StudentIdea", back_populates="group")
+    members = relationship("IdeaGroupMember", back_populates="group", cascade="all, delete-orphan")
+    messages = relationship("GroupMessage", back_populates="group", cascade="all, delete-orphan")
+
+class IdeaGroupMember(Base):
+    __tablename__ = "idea_group_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("idea_groups.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(50), default="member") # lead, mentor, member
+    joined_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    group = relationship("IdeaGroup", back_populates="members")
+    user = relationship("User")
+
+class GroupMessage(Base):
+    __tablename__ = "group_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("idea_groups.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    content = Column(Text, nullable=False)
+    file_url = Column(String(500), nullable=True)
+    file_name = Column(String(255), nullable=True)
+    file_type = Column(String(50), nullable=True) # doc, docx, pdf, ppt, pptx
+    file_size = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    group = relationship("IdeaGroup", back_populates="messages")
+    sender = relationship("User")
 
 class Conversation(Base):
     __tablename__ = "conversations"

@@ -132,6 +132,18 @@ export interface StudentIdea {
   created_at: string;
   is_author: boolean;
   user_application_status?: string | null;
+  mentor?: {
+    id: number;
+    full_name: string;
+    role: string;
+    headline?: string;
+    avatar_url?: string;
+    university?: string;
+  } | null;
+  group?: {
+    id: number;
+    name: string;
+  } | null;
   author: {
     id: number;
     full_name: string;
@@ -192,6 +204,37 @@ export interface ATSMatchResult {
   job_title?: string;
 }
 
+export interface ExtractedResumeData {
+  headline: string;
+  about: string;
+  university: string;
+  location: string;
+  skills: string[];
+  educations: {
+    school: string;
+    degree: string;
+    field_of_study: string;
+    start_year: string;
+    end_year: string;
+  }[];
+  experiences: {
+    company: string;
+    title: string;
+    employment_type: string;
+    start_date: string;
+    end_date: string;
+    description: string;
+    is_current: boolean;
+  }[];
+}
+
+export interface OptimizedResumeResult {
+  optimized_resume_text: string;
+  added_keywords: string[];
+  projected_score: number;
+  improvements_made: string[];
+}
+
 export interface PeerRecommendation {
   user_id: number;
   full_name: string;
@@ -239,4 +282,87 @@ export interface ConversationItem {
   };
   last_message: string;
   last_message_time: string;
+}
+
+export interface IdeaGroupMemberInfo {
+  id: number;
+  full_name: string;
+  avatar_url?: string;
+  headline?: string;
+  role: string;
+}
+
+export interface IdeaGroupItem {
+  id: number;
+  idea_id: number;
+  name: string;
+  idea_title: string;
+  my_role: string;
+  members_count: number;
+  members: IdeaGroupMemberInfo[];
+  last_message: string;
+  last_message_time: string;
+}
+
+export interface GroupMessageItem {
+  id: number;
+  group_id: number;
+  sender_id: number;
+  sender_name: string;
+  sender_avatar?: string;
+  sender_role: string;
+  content: string;
+  file_url?: string | null;
+  file_name?: string | null;
+  file_type?: string | null;
+  file_size?: string | null;
+  created_at: string;
+}
+
+export interface MentorInfo {
+  id: number;
+  full_name: string;
+  email: string;
+  role: string;
+  headline: string;
+  avatar_url?: string;
+  university?: string;
+  location?: string;
+  causes?: string;
+}
+
+export interface SearchResults {
+  query: string;
+  total: number;
+  users: {
+    id: number;
+    full_name: string;
+    role: string;
+    headline: string;
+    avatar_url: string;
+    university: string;
+    location: string;
+  }[];
+  ideas: {
+    id: number;
+    title: string;
+    summary: string;
+    cause_tag: string;
+    author_name: string;
+    spots_remaining: number;
+  }[];
+  jobs: {
+    id: number;
+    title: string;
+    company_name: string;
+    location: string;
+    job_type: string;
+    cause_area: string;
+  }[];
+  posts: {
+    id: number;
+    content: string;
+    author_name: string;
+    tags: string;
+  }[];
 }

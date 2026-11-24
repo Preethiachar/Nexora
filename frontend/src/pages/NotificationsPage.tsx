@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Bell, Check, UserCheck, MessageSquare, Award, Clock } from "lucide-react";
+import { Bell, Check, UserCheck, MessageSquare, Award, Clock, Users } from "lucide-react";
 import { NotificationItem } from "../types";
 import { api } from "../services/api";
 
@@ -45,6 +45,10 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
     switch (type) {
       case "connection":
         return <UserCheck size={18} color="var(--primary)" />;
+      case "group_invite":
+        return <Users size={18} color="var(--civic)" />;
+      case "idea_mentor":
+        return <Award size={18} color="#eab308" />;
       case "idea_apply":
         return <Award size={18} color="var(--accent)" />;
       case "job_update":

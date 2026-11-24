@@ -5,7 +5,11 @@ import { api } from "../services/api";
 import { IdeaCard } from "../components/IdeaCard";
 import { CreateIdeaModal } from "../components/CreateIdeaModal";
 
-export const MarketplacePage: React.FC = () => {
+interface MarketplacePageProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const MarketplacePage: React.FC<MarketplacePageProps> = ({ onNavigate }) => {
   const [ideas, setIdeas] = useState<StudentIdea[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCause, setSelectedCause] = useState("All");
@@ -121,7 +125,7 @@ export const MarketplacePage: React.FC = () => {
       ) : ideas.length > 0 ? (
         <div className="idea-grid">
           {ideas.map((idea) => (
-            <IdeaCard key={idea.id} idea={idea} onRefresh={fetchIdeas} />
+            <IdeaCard key={idea.id} idea={idea} onRefresh={fetchIdeas} onNavigate={onNavigate} />
           ))}
         </div>
       ) : (

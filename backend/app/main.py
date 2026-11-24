@@ -1,10 +1,13 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.database.session import engine, Base, SessionLocal
 from app.database.seed_data import seed_database
-from app.api import auth, profiles, posts, connections, marketplace, jobs, ai, messages, notifications
+from app.models.all_models import StudentIdea, IdeaGroup, IdeaGroupMember, GroupMessage
+from app.api import auth, profiles, posts, connections, marketplace, jobs, ai, messages, notifications, search
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -14,6 +17,29 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_database(db)
+
+        # Backfill groups for ideas that have accepted members
+        ideas = db.query(StudentIdea).all()
+        for idea in ideas:
+            accepted_members = [m for m in idea.members if m.status == "accepted"]
+            if accepted_members:
+                group = db.query(IdeaGroup).filter(IdeaGroup.idea_id == idea.id).first()
+                if not group:
+                    group = IdeaGroup(idea_id=idea.id, name=f"{idea.title} - Team")
+                    db.add(group)
+                    db.flush()
+                    db.add(IdeaGroupMember(group_id=group.id, user_id=idea.author_id, role="lead"))
+                    if idea.mentor_id:
+                        db.add(IdeaGroupMember(group_id=group.id, user_id=idea.mentor_id, role="mentor"))
+                    for m in accepted_members:
+                        if m.user_id != idea.author_id:
+                            db.add(IdeaGroupMember(group_id=group.id, user_id=m.user_id, role="member"))
+                    db.add(GroupMessage(
+                        group_id=group.id,
+                        sender_id=idea.author_id,
+                        content=f"Welcome everyone to the {idea.title} collaboration group! Share documents, plans, and ideas here. 🚀"
+                    ))
+                    db.commit()
     finally:
         db.close()
     yield
@@ -24,6 +50,11 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Static files for document & media uploads
+uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+os.makedirs(os.path.join(uploads_dir, "documents"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # CORS configuration
 app.add_middleware(
@@ -44,6 +75,7 @@ app.include_router(jobs.router, prefix=settings.API_V1_STR)
 app.include_router(ai.router, prefix=settings.API_V1_STR)
 app.include_router(messages.router, prefix=settings.API_V1_STR)
 app.include_router(notifications.router, prefix=settings.API_V1_STR)
+app.include_router(search.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():

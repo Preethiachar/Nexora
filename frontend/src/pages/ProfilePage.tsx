@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { 
   Sparkles, CheckCircle2, Award, Plus, MapPin, 
-  Building2, GraduationCap, ThumbsUp, X, Camera, Upload, Check, Image as ImageIcon
+  Building2, GraduationCap, ThumbsUp, X, Camera, Upload, Check, 
+  Image as ImageIcon, FileText, FileCheck, Wand2, Trash2
 } from "lucide-react";
-import { UserProfile, UserSummary } from "../types";
+import { UserProfile, UserSummary, ExtractedResumeData } from "../types";
 import { api } from "../services/api";
 
 const PRESET_AVATARS = [
@@ -35,6 +36,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onProfile
   const [aiTargetRole, setAiTargetRole] = useState("Civic Tech Software Engineer");
   const [aiSuggestions, setAiSuggestions] = useState<{ headline: string; about: string } | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  // Resume auto-extraction modal state
+  const [showResumeExtractModal, setShowResumeExtractModal] = useState(false);
+  const [resumeTextToExtract, setResumeTextToExtract] = useState("");
+  const [isExtractingResume, setIsExtractingResume] = useState(false);
+  const [extractedData, setExtractedData] = useState<ExtractedResumeData | null>(null);
+  const [isApplyingExtracted, setIsApplyingExtracted] = useState(false);
+  const [extractSuccessMsg, setExtractSuccessMsg] = useState("");
 
   // Add modals
   const [showAddExpModal, setShowAddExpModal] = useState(false);
@@ -90,6 +99,64 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onProfile
       console.error("Failed to apply profile update:", err);
     }
   };
+
+  const handleExtractResume = async () => {
+    if (!resumeTextToExtract.trim()) return;
+    setIsExtractingResume(true);
+    setExtractSuccessMsg("");
+    try {
+      const data = await api.extractResume(resumeTextToExtract.trim());
+      setExtractedData(data);
+    } catch (err) {
+      console.error("Resume extraction failed:", err);
+    } finally {
+      setIsExtractingResume(false);
+    }
+  };
+
+  const handleResumeFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        if (text) {
+          setResumeTextToExtract(text);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleApplyExtractedResume = async () => {
+    if (!extractedData) return;
+    setIsApplyingExtracted(true);
+    try {
+      await api.applyExtractedResume(extractedData);
+      setExtractSuccessMsg("✅ Education, skills, and experience successfully saved to your profile!");
+      setTimeout(() => {
+        setShowResumeExtractModal(false);
+        setExtractedData(null);
+        setResumeTextToExtract("");
+        setExtractSuccessMsg("");
+      }, 1400);
+      loadProfile();
+      onProfileUpdated();
+    } catch (err) {
+      console.error("Failed to apply extracted resume data:", err);
+    } finally {
+      setIsApplyingExtracted(false);
+    }
+  };
+
+  const handleRemoveExtractedSkill = (skillToRemove: string) => {
+    if (!extractedData) return;
+    setExtractedData({
+      ...extractedData,
+      skills: extractedData.skills.filter((s) => s !== skillToRemove),
+    });
+  };
+
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -240,14 +307,24 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onProfile
               </button>
             </div>
 
-            <button
-              className="btn-civic"
-              onClick={() => setShowAIModal(true)}
-              style={{ fontSize: "0.84rem" }}
-            >
-              <Sparkles size={16} />
-              <span>Optimize with Claude AI</span>
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <button
+                className="btn-primary"
+                onClick={() => setShowResumeExtractModal(true)}
+                style={{ fontSize: "0.84rem", display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <FileText size={16} />
+                <span>Auto-Extract from Resume</span>
+              </button>
+              <button
+                className="btn-civic"
+                onClick={() => setShowAIModal(true)}
+                style={{ fontSize: "0.84rem" }}
+              >
+                <Sparkles size={16} />
+                <span>Optimize with Claude AI</span>
+              </button>
+            </div>
           </div>
 
           {/* Details */}
@@ -296,6 +373,55 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onProfile
             )}
           </div>
         </div>
+      </div>
+
+      {/* Resume Extraction Quick Banner */}
+      <div
+        className="nexora-card"
+        style={{
+          marginBottom: 16,
+          padding: "16px 20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 12,
+          background: "linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)",
+          border: "1px solid #bbf7d0",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 10,
+              backgroundColor: "#dcfce7",
+              color: "#166534",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <FileCheck size={24} />
+          </div>
+          <div>
+            <h4 style={{ fontFamily: "var(--font-heading)", fontSize: "0.95rem", fontWeight: 700, color: "#166534" }}>
+              ⚡ Fast-Track Profile: Auto-Extract from Resume
+            </h4>
+            <p style={{ fontSize: "0.8rem", color: "#475569", marginTop: 2 }}>
+              Upload your resume or paste text to automatically parse and populate your Education, Skills, and Experience with AI.
+            </p>
+          </div>
+        </div>
+        <button
+          className="btn-civic"
+          onClick={() => setShowResumeExtractModal(true)}
+          style={{ padding: "8px 16px", fontSize: "0.82rem", whiteSpace: "nowrap" }}
+        >
+          <Sparkles size={15} />
+          <span>Upload & Extract</span>
+        </button>
       </div>
 
       {/* About Section */}
@@ -835,6 +961,254 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onProfile
           </div>
         </div>
       )}
+
+      {/* Resume Auto-Extraction Modal */}
+      {showResumeExtractModal && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: 740, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: "#eff6ff", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontFamily: "var(--font-heading)", fontSize: "1.05rem", fontWeight: 700 }}>
+                    Auto-Extract Profile from Resume
+                  </h3>
+                  <p style={{ fontSize: "0.76rem", color: "var(--text-secondary)" }}>
+                    Instantly extract Education, Skills, and Experience to populate your verified profile.
+                  </p>
+                </div>
+              </div>
+              <button
+                className="btn-ghost"
+                style={{ padding: 4 }}
+                onClick={() => {
+                  setShowResumeExtractModal(false);
+                  setExtractedData(null);
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ overflowY: "auto", flex: 1, padding: 20 }}>
+              {extractSuccessMsg && (
+                <div style={{ padding: "12px 16px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", borderRadius: 8, marginBottom: 16, fontSize: "0.85rem", fontWeight: 600 }}>
+                  {extractSuccessMsg}
+                </div>
+              )}
+
+              {!extractedData ? (
+                <>
+                  {/* File Upload Area */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: "2px dashed #cbd5e1",
+                        borderRadius: 12,
+                        padding: "24px 16px",
+                        cursor: "pointer",
+                        backgroundColor: "#f8fafc",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#cbd5e1")}
+                    >
+                      <Upload size={28} color="var(--primary)" style={{ marginBottom: 8 }} />
+                      <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                        Click to upload resume (.txt, .md, text)
+                      </span>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 4 }}>
+                        Or paste your resume text below
+                      </span>
+                      <input
+                        type="file"
+                        accept=".txt,.md,.rtf,.pdf"
+                        style={{ display: "none" }}
+                        onChange={handleResumeFileUpload}
+                      />
+                    </label>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <label className="form-label" style={{ margin: 0 }}>Resume Content</label>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{ fontSize: "0.74rem", padding: "2px 8px" }}
+                      onClick={() =>
+                        setResumeTextToExtract(
+                          `Preethi Achar\n` +
+                          `Student in Computer Science & Engineering | National Institute of Technology\n` +
+                          `Bengaluru, India | Email: preethi@nit.ac.in\n\n` +
+                          `Education:\n` +
+                          `- National Institute of Technology, B.Tech in Computer Science & Engineering (2022 - 2026)\n\n` +
+                          `Skills:\n` +
+                          `Python, React, TypeScript, FastAPI, SQL, Scikit-Learn, Git, Docker, Community Organizing, Civic Tech, Youth Leadership\n\n` +
+                          `Experience:\n` +
+                          `- Full-Stack Intern @ CivicPulse Lab (2024 - Present):\n` +
+                          `  Developed real-time civic participation telemetry using FastAPI and React. Mobilized 50+ students across community cleanup mapping campaigns.\n` +
+                          `- Student Lead @ Youth Tech Innovation (2023 - 2024):\n` +
+                          `  Conducted peer workshops on accessible web development and coordinated hackathon initiatives.`
+                        )
+                      }
+                    >
+                      Load Sample Resume
+                    </button>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 16 }}>
+                    <textarea
+                      className="form-textarea"
+                      rows={8}
+                      placeholder="Paste your resume or CV text here..."
+                      value={resumeTextToExtract}
+                      onChange={(e) => setResumeTextToExtract(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ width: "100%", justifyContent: "center", padding: "10px 0" }}
+                    onClick={handleExtractResume}
+                    disabled={isExtractingResume || !resumeTextToExtract.trim()}
+                  >
+                    <Wand2 size={16} />
+                    <span>{isExtractingResume ? "Parsing Education, Skills & Experience with AI..." : "Extract Resume Details"}</span>
+                  </button>
+                </>
+              ) : (
+                /* Extracted Review Mode */
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span className="badge-tag badge-tag-civic" style={{ fontSize: "0.8rem", padding: "4px 10px" }}>
+                      ✨ AI Extracted Successfully — Review Before Applying
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{ fontSize: "0.74rem" }}
+                      onClick={() => setExtractedData(null)}
+                    >
+                      Re-paste / Re-extract
+                    </button>
+                  </div>
+
+                  {/* Headline & Summary */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: 14, borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                    <label className="form-label">Extracted Headline</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={extractedData.headline}
+                      onChange={(e) => setExtractedData({ ...extractedData, headline: e.target.value })}
+                    />
+                    <label className="form-label" style={{ marginTop: 10 }}>Extracted About & Bio</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={3}
+                      value={extractedData.about}
+                      onChange={(e) => setExtractedData({ ...extractedData, about: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Extracted Skills */}
+                  <div style={{ backgroundColor: "#f0fdf4", padding: 14, borderRadius: 8, border: "1px solid #bbf7d0" }}>
+                    <label className="form-label" style={{ color: "#166534", fontWeight: 700 }}>
+                      Extracted Skills ({extractedData.skills.length})
+                    </label>
+                    <p style={{ fontSize: "0.74rem", color: "#475569", marginBottom: 8 }}>
+                      Click the × icon to remove any skill you don't want on your profile.
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {extractedData.skills.map((skill, idx) => (
+                        <span
+                          key={idx}
+                          className="badge-tag badge-tag-civic"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.78rem" }}
+                        >
+                          <span>{skill}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExtractedSkill(skill)}
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", color: "#166534" }}
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Extracted Education */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: 14, borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "var(--primary)", fontWeight: 700 }}>
+                      <GraduationCap size={18} />
+                      <span style={{ fontSize: "0.9rem" }}>Extracted Education ({extractedData.educations.length})</span>
+                    </div>
+                    {extractedData.educations.map((edu, idx) => (
+                      <div key={idx} style={{ padding: 10, backgroundColor: "#ffffff", borderRadius: 6, border: "1px solid #e2e8f0", marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>{edu.school}</div>
+                        <div style={{ fontSize: "0.78rem", color: "#475569" }}>
+                          {edu.degree} — {edu.field_of_study} ({edu.start_year} - {edu.end_year})
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Extracted Experience */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: 14, borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "var(--civic)", fontWeight: 700 }}>
+                      <Building2 size={18} />
+                      <span style={{ fontSize: "0.9rem" }}>Extracted Experience ({extractedData.experiences.length})</span>
+                    </div>
+                    {extractedData.experiences.map((exp, idx) => (
+                      <div key={idx} style={{ padding: 10, backgroundColor: "#ffffff", borderRadius: 6, border: "1px solid #e2e8f0", marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>{exp.title} @ {exp.company}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 4 }}>
+                          {exp.employment_type} • {exp.start_date} - {exp.end_date}
+                        </div>
+                        <div style={{ fontSize: "0.78rem", color: "#334155" }}>{exp.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  setShowResumeExtractModal(false);
+                  setExtractedData(null);
+                }}
+              >
+                Close
+              </button>
+              {extractedData && (
+                <button
+                  type="button"
+                  className="btn-civic"
+                  onClick={handleApplyExtractedResume}
+                  disabled={isApplyingExtracted}
+                >
+                  <Check size={16} />
+                  <span>{isApplyingExtracted ? "Saving to Database..." : "Apply All to My Nexora Profile"}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

@@ -108,7 +108,7 @@ export const App: React.FC = () => {
             <RightSidebar onNavigate={setActiveTab} />
           </div>
         ) : activeTab === "marketplace" ? (
-          <MarketplacePage />
+          <MarketplacePage onNavigate={setActiveTab} />
         ) : activeTab === "jobs" ? (
           <JobsPage />
         ) : activeTab === "resume-screener" ? (

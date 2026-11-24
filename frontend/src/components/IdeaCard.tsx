@@ -1,18 +1,51 @@
 import React, { useState } from "react";
-import { Users, CheckCircle, Send, ShieldCheck, PlusCircle } from "lucide-react";
-import { StudentIdea } from "../types";
+import { Users, CheckCircle, Send, ShieldCheck, PlusCircle, Award, Sparkles, MessageSquare, X, Check } from "lucide-react";
+import { StudentIdea, MentorInfo } from "../types";
 import { api } from "../services/api";
 
 interface IdeaCardProps {
   idea: StudentIdea;
   onRefresh: () => void;
+  onNavigate?: (tab: string) => void;
 }
 
-export const IdeaCard: React.FC<IdeaCardProps> = ({ idea, onRefresh }) => {
+export const IdeaCard: React.FC<IdeaCardProps> = ({ idea, onRefresh, onNavigate }) => {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [roleTitle, setRoleTitle] = useState("Frontend Developer");
   const [applicationNote, setApplicationNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Mentor Selection State
+  const [showMentorModal, setShowMentorModal] = useState(false);
+  const [mentorsList, setMentorsList] = useState<MentorInfo[]>([]);
+  const [loadingMentors, setLoadingMentors] = useState(false);
+  const [isSelectingMentor, setIsSelectingMentor] = useState(false);
+
+  const handleOpenMentorModal = async () => {
+    setShowMentorModal(true);
+    setLoadingMentors(true);
+    try {
+      const mentors = await api.getMentors();
+      setMentorsList(mentors);
+    } catch (err) {
+      console.error("Failed to fetch mentors:", err);
+    } finally {
+      setLoadingMentors(false);
+    }
+  };
+
+  const handleSelectMentor = async (mentorId: number) => {
+    setIsSelectingMentor(true);
+    try {
+      await api.selectIdeaMentor(idea.id, mentorId);
+      setShowMentorModal(false);
+      onRefresh();
+    } catch (err) {
+      console.error("Failed to select mentor:", err);
+    } finally {
+      setIsSelectingMentor(false);
+    }
+  };
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +139,7 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({ idea, onRefresh }) => {
         </div>
 
         {/* Assembled Team Roster */}
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 14 }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)" }}>
             Active Team ({acceptedMembers.length}/{idea.team_size_target}):
           </span>
@@ -136,6 +169,70 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({ idea, onRefresh }) => {
             ))}
           </div>
         </div>
+
+        {/* Project Mentor Section */}
+        {idea.mentor ? (
+          <div
+            style={{
+              backgroundColor: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: 8,
+              padding: "8px 10px",
+              marginBottom: 14,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <img
+                src={idea.mentor.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=mentor"}
+                alt={idea.mentor.full_name}
+                style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }}
+              />
+              <div>
+                <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#166534", display: "flex", alignItems: "center", gap: 5 }}>
+                  <span>{idea.mentor.full_name}</span>
+                  <span className="badge-tag" style={{ backgroundColor: "#dcfce7", color: "#15803d", fontSize: "0.62rem" }}>
+                    Mentor
+                  </span>
+                </div>
+                <div style={{ fontSize: "0.68rem", color: "#15803d" }}>
+                  {idea.mentor.headline || "Civic & Industry Advisor"}
+                </div>
+              </div>
+            </div>
+            {idea.is_author && (
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ fontSize: "0.7rem", padding: "2px 8px", color: "#166534", fontWeight: 600 }}
+                onClick={handleOpenMentorModal}
+              >
+                Change
+              </button>
+            )}
+          </div>
+        ) : idea.is_author ? (
+          <div style={{ marginBottom: 14 }}>
+            <button
+              type="button"
+              className="btn-outline"
+              style={{
+                fontSize: "0.75rem",
+                padding: "6px 12px",
+                width: "100%",
+                justifyContent: "center",
+                borderColor: "#cbd5e1",
+                backgroundColor: "#fafafa"
+              }}
+              onClick={handleOpenMentorModal}
+            >
+              <Award size={15} color="var(--accent)" />
+              <span>Select a Project Mentor</span>
+            </button>
+          </div>
+        ) : null}
 
         {/* If author: review pending applications */}
         {idea.is_author && pendingMembers.length > 0 && (
@@ -189,50 +286,157 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({ idea, onRefresh }) => {
 
       {/* Action footer */}
       <div>
-        {idea.is_author ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: "0.78rem",
-              color: "var(--civic)",
-              fontWeight: 700,
-            }}
-          >
-            <ShieldCheck size={16} />
-            <span>You are the Project Lead</span>
-          </div>
-        ) : idea.user_application_status ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: "0.8rem",
-              fontWeight: 700,
-              color: idea.user_application_status === "accepted" ? "#059669" : "#d97706",
-            }}
-          >
-            <CheckCircle size={16} />
-            <span>
-              {idea.user_application_status === "accepted"
-                ? "You are an active teammate!"
-                : "Application submitted (Under review)"}
-            </span>
-          </div>
-        ) : (
-          <button
-            className="btn-civic"
-            style={{ width: "100%", justifyContent: "center" }}
-            onClick={() => setShowApplyModal(true)}
-            disabled={idea.spots_remaining <= 0}
-          >
-            <PlusCircle size={16} />
-            <span>{idea.spots_remaining > 0 ? "Apply to Join Team" : "Team Full"}</span>
-          </button>
-        )}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          {idea.is_author ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "0.78rem",
+                color: "var(--civic)",
+                fontWeight: 700,
+              }}
+            >
+              <ShieldCheck size={16} />
+              <span>You are the Project Lead</span>
+            </div>
+          ) : idea.user_application_status ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                color: idea.user_application_status === "accepted" ? "#059669" : "#d97706",
+              }}
+            >
+              <CheckCircle size={16} />
+              <span>
+                {idea.user_application_status === "accepted"
+                  ? "You are an active teammate!"
+                  : "Application submitted (Under review)"}
+              </span>
+            </div>
+          ) : (
+            <button
+              className="btn-civic"
+              style={{ width: "100%", justifyContent: "center" }}
+              onClick={() => setShowApplyModal(true)}
+              disabled={idea.spots_remaining <= 0}
+            >
+              <PlusCircle size={16} />
+              <span>{idea.spots_remaining > 0 ? "Apply to Join Team" : "Team Full"}</span>
+            </button>
+          )}
+
+          {/* If author or teammate: Direct Team Group Chat Button */}
+          {(idea.is_author || idea.user_application_status === "accepted") && (
+            <button
+              type="button"
+              className="btn-civic"
+              style={{
+                fontSize: "0.74rem",
+                padding: "4px 10px",
+                gap: 5,
+                whiteSpace: "nowrap"
+              }}
+              onClick={() => onNavigate?.("messages")}
+              title="Open Project Team Group in Messaging"
+            >
+              <MessageSquare size={13} />
+              <span>Team Chat</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Select Mentor Modal */}
+      {showMentorModal && (
+        <div className="modal-overlay" onClick={() => setShowMentorModal(false)}>
+          <div className="modal-content" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Award size={20} color="var(--accent)" />
+                <h3>Select Mentor for "{idea.title}"</h3>
+              </div>
+              <button className="btn-ghost" onClick={() => setShowMentorModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: 420, overflowY: "auto" }}>
+              <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 14 }}>
+                Choose an experienced faculty, civic innovation fellow, or industry mentor to guide your project.
+                Selected mentors receive a notification and join your project team group.
+              </p>
+
+              {loadingMentors ? (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                  Finding available mentors...
+                </div>
+              ) : mentorsList.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                  No mentors found at this moment.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {mentorsList.map((m) => (
+                    <div
+                      key={m.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: 10,
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 8,
+                        backgroundColor: idea.mentor?.id === m.id ? "#f0fdf4" : "#ffffff",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <img
+                          src={m.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=mentor"}
+                          alt={m.full_name}
+                          style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover" }}
+                        />
+                        <div>
+                          <div style={{ fontSize: "0.84rem", fontWeight: 700 }}>
+                            {m.full_name}
+                          </div>
+                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+                            {m.headline || m.university || m.role}
+                          </div>
+                          {m.causes && (
+                            <div style={{ fontSize: "0.68rem", color: "var(--civic)", marginTop: 2 }}>
+                              Domains: {m.causes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={idea.mentor?.id === m.id ? "btn-outline-civic" : "btn-civic"}
+                        style={{ padding: "4px 12px", fontSize: "0.74rem" }}
+                        disabled={isSelectingMentor || idea.mentor?.id === m.id}
+                        onClick={() => handleSelectMentor(m.id)}
+                      >
+                        {idea.mentor?.id === m.id ? "Current Mentor" : "Select"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-ghost" onClick={() => setShowMentorModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Join Team Modal */}
       {showApplyModal && (

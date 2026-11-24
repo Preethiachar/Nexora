@@ -92,6 +92,7 @@ class StudentIdeaCreate(BaseModel):
     cause_tag: str = "Civic Tech"
     needed_skills: str # Comma-separated
     team_size_target: int = 4
+    mentor_id: Optional[int] = None
 
 class IdeaMemberApply(BaseModel):
     role_title: str
@@ -136,7 +137,40 @@ class AIChatRequest(BaseModel):
     question: str
     context: Optional[str] = ""
 
+class AIResumeExtractRequest(BaseModel):
+    resume_text: str
+
+class AIExtractedProfileApplyRequest(BaseModel):
+    headline: Optional[str] = None
+    about: Optional[str] = None
+    university: Optional[str] = None
+    location: Optional[str] = None
+    skills: Optional[List[str]] = []
+    educations: Optional[List[EducationSchema]] = []
+    experiences: Optional[List[ExperienceSchema]] = []
+
+class AIGenerateEmailRequest(BaseModel):
+    recipient_name: str
+    recipient_headline: Optional[str] = ""
+    mail_type: str = "internship_inquiry" # internship_inquiry, collaboration_pitch, coffee_chat_mentorship, application_followup, networking
+    tone: str = "professional" # professional, enthusiastic, concise, formal
+    key_notes: Optional[str] = ""
+
+class AIBuildOptimizedResumeRequest(BaseModel):
+    resume_text: str
+    job_title: Optional[str] = "Target Opportunity"
+    job_description: Optional[str] = ""
+    missing_skills: Optional[List[str]] = []
+    recommendations: Optional[List[str]] = []
+
 # --- Message Schemas ---
 class MessageCreate(BaseModel):
     receiver_id: int
     content: str
+
+class StudentIdeaMentorSelect(BaseModel):
+    mentor_id: int
+
+class GroupMessageCreate(BaseModel):
+    content: str
+
