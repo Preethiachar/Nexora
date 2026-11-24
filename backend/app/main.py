@@ -40,6 +40,8 @@ async def lifespan(app: FastAPI):
                         content=f"Welcome everyone to the {idea.title} collaboration group! Share documents, plans, and ideas here. 🚀"
                     ))
                     db.commit()
+    except Exception as e:
+        print(f"Warning during startup seeding/backfill: {e}")
     finally:
         db.close()
     yield
